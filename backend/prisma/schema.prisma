@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  student
+  admin
+}
+
+enum QuizStatus {
+  draft
+  active
+  closed
+}
+
+enum SessionStatus {
+  active
+  submitted
+  expired
+}
+
+enum QuestionType {
+  mcq
+}
+
+enum EventType {
+  focus
+  blur
+  answer_changed
+  revisit
+  submitted
+}
+
+model User {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  role         Role      @default(student)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  sessions     Session[]
+
+  @@map("users")
+}
+
+model Quiz {
+  id               String      @id @default(uuid())
+  title            String
+  description      String?
+  createdBy        String      @map("created_by")
+  durationSeconds  Int         @map("duration_seconds")
+  shuffleQuestions Boolean     @default(false) @map("shuffle_questions")
+  status           QuizStatus  @default(draft)
+  startTime        DateTime?   @map("start_time")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  questions        Question[]
+  sessions         Session[]
+
+  @@map("quizzes")
+}
+
+model Question {
+  id            String        @id @default(uuid())
+  quizId        String        @map("quiz_id")
+  text          String
+  questionType  QuestionType  @default(mcq) @map("question_type")
+  options       Json          // Array of { id: string, text: string }
+  correctAnswer String        @map("correct_answer")
+  marks         Int           @default(1)
+  orderIndex    Int           @map("order_index")
+  quiz          Quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  events        QuestionEvent[]
+  answers       SessionAnswer[]
+
+  @@map("questions")
+}
+
+model Session {
+  id          String        @id @default(uuid())
+  studentId   String        @map("student_id")
+  quizId      String        @map("quiz_id")
+  startedAt   DateTime      @default(now()) @map("started_at")
+  submittedAt DateTime?     @map("submitted_at")
+  status      SessionStatus @default(active)
+  score       Int?
+  totalMarks  Int?          @map("total_marks")
+  ipAddress   String?       @map("ip_address")
+  student     User          @relation(fields: [studentId], references: [id])
+  quiz        Quiz          @relation(fields: [quizId], references: [id])
+  events      QuestionEvent[]
+  answers     SessionAnswer[]
+
+  @@map("sessions")
+}
+
+model QuestionEvent {
+  id         BigInt    @id @default(autoincrement())
+  sessionId  String    @map("session_id")
+  questionId String    @map("question_id")
+  eventType  EventType @map("event_type")
+  payload    Json?
+  createdAt  DateTime  @default(now()) @map("created_at")
+  session    Session   @relation(fields: [sessionId], references: [id])
+  question   Question  @relation(fields: [questionId], references: [id])
+
+  @@index([sessionId])
+  @@index([questionId])
+  @@map("question_events")
+}
+
+model SessionAnswer {
+  sessionId      String   @map("session_id")
+  questionId     String   @map("question_id")
+  answer         String?
+  changeCount    Int      @default(0) @map("change_count")
+  timeSpentMs    BigInt   @default(0) @map("time_spent_ms")
+  markedForReview Boolean @default(false) @map("marked_for_review")
+  isCorrect      Boolean? @map("is_correct")
+  lastUpdated    DateTime @default(now()) @updatedAt @map("last_updated")
+  session        Session  @relation(fields: [sessionId], references: [id])
+  question       Question @relation(fields: [questionId], references: [id])
+
+  @@id([sessionId, questionId])
+  @@map("session_answers")
+}
