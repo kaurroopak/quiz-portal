@@ -45,3 +45,5 @@ migration_lock.toml
 # *.json
 # !package.json
 # !tsconfig.json
+*.xlsx
+*.csv
