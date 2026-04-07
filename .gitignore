@@ -47,3 +47,5 @@ migration_lock.toml
 # !tsconfig.json
 *.xlsx
 *.csv
+load_to_postgres.py
+requirements.txt
