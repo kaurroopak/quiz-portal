@@ -9,22 +9,23 @@ export default function AdminQuizDetail() {
   const navigate = useNavigate();
   const [quiz, setQuiz] = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
+  const [concepts, setConcepts] = useState<any[]>([]);
   const [tab, setTab] = useState<'questions' | 'results'>('questions');
   const [showQModal, setShowQModal] = useState(false);
   const [editQ, setEditQ] = useState<any>(null);
-  const [qForm, setQForm] = useState({ text: '', options: [{ id: 'A', text: '' }, { id: 'B', text: '' }, { id: 'C', text: '' }, { id: 'D', text: '' }], correctAnswer: 'A', marks: 1, orderIndex: 0 });
+  const [qForm, setQForm] = useState({ text: '', options: [{ id: 'A', text: '' }, { id: 'B', text: '' }, { id: 'C', text: '' }, { id: 'D', text: '' }], correctAnswer: 'A', marks: 1, orderIndex: 0, conceptName: '' });
   const [saving, setSaving] = useState(false);
   const api = apiClient(token);
 
   const load = async () => {
-    const [q, s] = await Promise.all([api.get(`/admin/quizzes/${quizId}`), api.get(`/admin/quizzes/${quizId}/sessions`)]);
-    setQuiz(q.data); setSessions(s.data);
+    const [q, s, c] = await Promise.all([api.get(`/admin/quizzes/${quizId}`), api.get(`/admin/quizzes/${quizId}/sessions`), api.get('/admin/concepts')]);
+    setQuiz(q.data); setSessions(s.data); setConcepts(c.data);
   };
 
   useEffect(() => { load(); }, []);
 
-  const openAddQ = () => { setEditQ(null); setQForm({ text: '', options: [{ id: 'A', text: '' }, { id: 'B', text: '' }, { id: 'C', text: '' }, { id: 'D', text: '' }], correctAnswer: 'A', marks: 1, orderIndex: quiz?.questions?.length || 0 }); setShowQModal(true); };
-  const openEditQ = (q: any) => { setEditQ(q); setQForm({ text: q.text, options: q.options, correctAnswer: q.correctAnswer, marks: q.marks, orderIndex: q.orderIndex }); setShowQModal(true); };
+  const openAddQ = () => { setEditQ(null); setQForm({ text: '', options: [{ id: 'A', text: '' }, { id: 'B', text: '' }, { id: 'C', text: '' }, { id: 'D', text: '' }], correctAnswer: 'A', marks: 1, orderIndex: quiz?.questions?.length || 0, conceptName: '' }); setShowQModal(true); };
+  const openEditQ = (q: any) => { setEditQ(q); setQForm({ text: q.text, options: q.options, correctAnswer: q.correctAnswer, marks: q.marks, orderIndex: q.orderIndex, conceptName: q.concept?.name || '' }); setShowQModal(true); };
 
   const saveQuestion = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true);
@@ -75,7 +76,10 @@ export default function AdminQuizDetail() {
                   <div key={q.id} className="card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Q{i + 1} · {q.marks} mark{q.marks > 1 ? 's' : ''}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>
+                          Q{i + 1} · {q.marks} mark{q.marks > 1 ? 's' : ''}
+                          {q.concept?.name && <span style={{ marginLeft: 8, background: 'var(--primary-light)', color: 'white', padding: '2px 6px', borderRadius: 4, opacity: 0.8 }}>{q.concept.name}</span>}
+                        </div>
                         <div style={{ fontWeight: 500, marginBottom: 12 }}>{q.text}</div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                           {(q.options as any[]).map((opt: any) => (
@@ -145,6 +149,13 @@ export default function AdminQuizDetail() {
                 </select>
               </div>
               <div className="form-group"><label className="label">Marks</label><input className="input" type="number" min={1} value={qForm.marks} onChange={e => setQForm(f => ({ ...f, marks: parseInt(e.target.value) }))} /></div>
+              <div className="form-group">
+                <label className="label">Concept (Optional)</label>
+                <input className="input" list="concept-list" value={qForm.conceptName} onChange={e => setQForm(f => ({ ...f, conceptName: e.target.value }))} placeholder="Select or type new concept..." />
+                <datalist id="concept-list">
+                  {concepts.map(c => <option key={c.id} value={c.name} />)}
+                </datalist>
+              </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button type="button" className="btn btn-outline w-full" onClick={() => setShowQModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary w-full" disabled={saving}>{saving ? 'Saving...' : 'Save Question'}</button>

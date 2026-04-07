@@ -31,7 +31,7 @@ async function main() {
       data: {
         name,
         email,
-        passwordHash,
+        password_hash: passwordHash,
         role: 'admin',
       },
     });

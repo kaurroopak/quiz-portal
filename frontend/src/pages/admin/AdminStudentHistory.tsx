@@ -46,6 +46,32 @@ export default function AdminStudentHistory() {
             </div>
           </div>
 
+          {student.conceptProgress && student.conceptProgress.length > 0 && (
+            <>
+              <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Concept Mastery</h2>
+              <div className="table-wrap" style={{ marginBottom: 28 }}>
+                <table>
+                  <thead><tr><th>Concept</th><th>Questions Attempted</th><th>Correct Answers</th><th>Marks Scored</th><th>Accuracy</th></tr></thead>
+                  <tbody>
+                    {student.conceptProgress.map((c: any) => (
+                      <tr key={c.conceptName}>
+                        <td style={{ fontWeight: 600 }}>{c.conceptName}</td>
+                        <td>{c.total}</td>
+                        <td>{c.correct}</td>
+                        <td>{c.score} / {c.totalMarks}</td>
+                        <td>
+                          <span className={`badge badge-${c.score / c.totalMarks >= 0.7 ? 'active' : 'draft'}`}>
+                            {Math.round((c.score / c.totalMarks) * 100)}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
           <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Quiz History</h2>
           {student.sessions?.length === 0 ? (
             <div className="empty-state" style={{ background: 'var(--bg-surface)' }}><p>No quiz attempts found for this student.</p></div>

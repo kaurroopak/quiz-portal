@@ -2,13 +2,14 @@ import { Response } from 'express';
 import prisma from '../config/db';
 import redis from '../config/redis';
 import { computeScore } from '../services/score.service';
+import { KnowledgeService } from '../services/knowledge.service';
 
 export const listActiveQuizzes = async (_req: any, res: Response) => {
   try {
     const quizzes = await prisma.quiz.findMany({
       where: { status: 'active' },
       include: { _count: { select: { questions: true } } },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { created_at: 'desc' },
     });
     res.json(quizzes);
   } catch { res.status(500).json({ error: 'Server error' }); }
@@ -17,50 +18,79 @@ export const listActiveQuizzes = async (_req: any, res: Response) => {
 export const startSession = async (req: any, res: Response) => {
   try {
     const { quizId } = req.body;
-    const quiz = await prisma.quiz.findUnique({ where: { id: quizId }, include: { questions: { orderBy: { orderIndex: 'asc' } } } });
+    const quiz = await prisma.quiz.findUnique({ where: { id: quizId }, include: { questions: { orderBy: { order_index: 'asc' } } } });
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
     if (quiz.status !== 'active') return res.status(400).json({ error: 'Quiz is not active' });
 
-    const existing = await prisma.session.findFirst({ where: { studentId: req.user.id, quizId, status: 'active' } });
+    const existing = await prisma.session.findFirst({ where: { student_id: req.user.id, quiz_id: quizId, status: 'active' } });
+    
+    // Process questions to ensure they have the 'options' array for the frontend
+    const processQuestions = (qs: any[]) => {
+      return qs.map(({ correct_answer: _ca, ...q }) => {
+        let options = q.options;
+        if (!options && q.option_a) {
+          options = [
+            { id: 'A', text: q.option_a },
+            { id: 'B', text: q.option_b },
+            { id: 'C', text: q.option_c },
+            { id: 'D', text: q.option_d },
+          ].filter(o => o.text);
+        }
+        return { ...q, options };
+      });
+    };
+
     if (existing) {
       const remaining = await redis.get(`session:${existing.id}:remaining`);
-      const questions = quiz.shuffleQuestions ? shuffle(quiz.questions) : quiz.questions;
-      const safeQuestions = questions.map(({ correctAnswer: _ca, ...q }) => q);
-      return res.json({ session: existing, questions: safeQuestions, remainingSeconds: remaining ? parseInt(remaining as string) : quiz.durationSeconds });
+      const questions = quiz.shuffle_questions ? shuffle(quiz.questions) : quiz.questions;
+      return res.json({ session: existing, questions: processQuestions(questions), remainingSeconds: remaining ? parseInt(remaining as string) : quiz.duration_seconds });
     }
 
-    const session = await prisma.session.create({ data: { studentId: req.user.id, quizId, ipAddress: req.ip } });
-    await redis.setEx(`session:${session.id}:remaining`, quiz.durationSeconds, String(quiz.durationSeconds));
+    const session = await prisma.session.create({ data: { student_id: req.user.id, quiz_id: quizId, ip_address: req.ip } });
+    await redis.setEx(`session:${session.id}:remaining`, quiz.duration_seconds, String(quiz.duration_seconds));
 
-    const questions = quiz.shuffleQuestions ? shuffle(quiz.questions) : quiz.questions;
-    const safeQuestions = questions.map(({ correctAnswer: _ca, ...q }) => q);
-    res.status(201).json({ session, questions: safeQuestions, remainingSeconds: quiz.durationSeconds });
+    const questions = quiz.shuffle_questions ? shuffle(quiz.questions) : quiz.questions;
+    res.status(201).json({ session, questions: processQuestions(questions), remainingSeconds: quiz.duration_seconds });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 };
 
 export const getSessionStatus = async (req: any, res: Response) => {
   try {
-    const session = await prisma.session.findFirst({ where: { id: req.params.id, studentId: req.user.id } });
+    const session = await prisma.session.findFirst({ where: { id: req.params.id, student_id: req.user.id } });
     if (!session) return res.status(404).json({ error: 'Session not found' });
     const remaining = await redis.get(`session:${session.id}:remaining`);
-    res.json({ status: session.status, remainingSeconds: remaining ? parseInt(remaining as string) : 0, submittedAt: session.submittedAt });
+    res.json({ status: session.status, remainingSeconds: remaining ? parseInt(remaining as string) : 0, submittedAt: session.submitted_at });
   } catch { res.status(500).json({ error: 'Server error' }); }
 };
 
 export const submitSession = async (req: any, res: Response) => {
   try {
-    const session = await prisma.session.findFirst({ where: { id: req.params.id, studentId: req.user.id, status: 'active' } });
+    const session = await prisma.session.findFirst({ where: { id: req.params.id, student_id: req.user.id, status: 'active' } });
     if (!session) return res.status(404).json({ error: 'Active session not found' });
 
     await flushRedisBuffer(session.id);
-    const { score, totalMarks } = await computeScore(session.id, session.quizId);
-    const updated = await prisma.session.update({ where: { id: session.id }, data: { status: 'submitted', submittedAt: new Date(), score, totalMarks } });
+    const { score, totalMarks } = await computeScore(session.id, session.quiz_id);
+    const updated = await prisma.session.update({ where: { id: session.id }, data: { status: 'submitted', submitted_at: new Date(), score, total_marks: totalMarks } });
 
-    const firstQ = await prisma.question.findFirst({ where: { quizId: session.quizId } });
-    if (firstQ) await prisma.questionEvent.create({ data: { sessionId: session.id, questionId: firstQ.id, eventType: 'submitted', payload: { score, totalMarks } } });
+    const firstQ = await prisma.question.findFirst({ where: { quiz_id: session.quiz_id } });
+    if (firstQ) await prisma.questionEvent.create({ data: { session_id: session.id, question_id: firstQ.question_id, event_type: 'submitted', payload: { score, totalMarks } } });
 
     await redis.del(`session:${session.id}:remaining`);
     await redis.del(`session:${session.id}:buffer`);
+
+    // --- Update Student Knowledge Graph (BKT) ---
+    // Fetch all answers for this session to update mastery probabilities
+    const sessionAnswers = await prisma.sessionAnswer.findMany({
+      where: { session_id: session.id },
+      select: { concept_id: true, is_correct: true }
+    });
+
+    for (const ans of sessionAnswers) {
+      if (ans.concept_id && ans.is_correct !== null) {
+        await KnowledgeService.updateMastery(session.student_id, ans.concept_id, ans.is_correct);
+      }
+    }
+
     res.json({ message: 'Quiz submitted', score, totalMarks, session: updated });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 };
@@ -68,9 +98,9 @@ export const submitSession = async (req: any, res: Response) => {
 export const mySessionHistory = async (req: any, res: Response) => {
   try {
     const sessions = await prisma.session.findMany({
-      where: { studentId: req.user.id },
-      include: { quiz: { select: { title: true, durationSeconds: true } } },
-      orderBy: { startedAt: 'desc' },
+      where: { student_id: req.user.id },
+      include: { quiz: { select: { title: true, duration_seconds: true } } },
+      orderBy: { started_at: 'desc' },
     });
     res.json(sessions);
   } catch { res.status(500).json({ error: 'Server error' }); }
@@ -80,12 +110,22 @@ export const flushRedisBuffer = async (sessionId: string) => {
   const bufferKey = `session:${sessionId}:buffer`;
   const buffer = await redis.hGetAll(bufferKey);
   if (!buffer || Object.keys(buffer).length === 0) return;
+
+  const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { quiz_id: true } });
+  if (!session) return;
+  const questions = await prisma.question.findMany({
+    where: { quiz_id: session.quiz_id },
+    include: { concepts: { select: { concept_id: true } } }
+  });
+  const conceptMap = new Map(questions.map(q => [q.question_id, q.concepts[0]?.concept_id || null]));
+
   for (const [questionId, raw] of Object.entries(buffer)) {
     const data = JSON.parse(raw as string);
+    const conceptId = conceptMap.get(questionId) || null;
     await prisma.sessionAnswer.upsert({
-      where: { sessionId_questionId: { sessionId, questionId } },
-      update: { answer: data.answer, changeCount: data.changeCount, timeSpentMs: BigInt(data.timeSpentMs), markedForReview: data.markedForReview },
-      create: { sessionId, questionId, answer: data.answer, changeCount: data.changeCount, timeSpentMs: BigInt(data.timeSpentMs), markedForReview: data.markedForReview },
+      where: { session_id_question_id: { session_id: sessionId, question_id: questionId } },
+      update: { selected_answer: data.answer, change_count: data.changeCount, time_taken_ms: BigInt(data.timeSpentMs), marked_for_review: data.markedForReview, concept_id: conceptId },
+      create: { session_id: sessionId, question_id: questionId, selected_answer: data.answer, change_count: data.changeCount, time_taken_ms: BigInt(data.timeSpentMs), marked_for_review: data.markedForReview, concept_id: conceptId },
     });
   }
 };

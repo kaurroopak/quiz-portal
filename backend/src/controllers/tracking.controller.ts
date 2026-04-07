@@ -15,7 +15,7 @@ export const batchEvents = async (req: any, res: Response) => {
     const sessionId: string = req.params.sessionId;
 
     const session = await prisma.session.findFirst({
-      where: { id: sessionId, studentId: req.user.id, status: 'active' },
+      where: { id: sessionId, student_id: req.user.id, status: 'active' },
     });
     if (!session) return res.status(404).json({ error: 'Active session not found' });
 
@@ -27,7 +27,7 @@ export const batchEvents = async (req: any, res: Response) => {
     const dbEvents: any[] = [];
 
     for (const event of events) {
-      dbEvents.push({ sessionId, questionId: event.question_id, eventType: event.event_type, payload: event.payload });
+      dbEvents.push({ session_id: sessionId, question_id: event.question_id, event_type: event.event_type, payload: event.payload });
 
       if (event.event_type === 'answer_changed' || event.event_type === 'blur') {
         const currentRaw = await redis.hGet(bufferKey, event.question_id);
