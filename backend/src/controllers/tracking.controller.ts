@@ -15,10 +15,16 @@ export const batchEvents = async (req: any, res: Response) => {
     const sessionId: string = req.params.sessionId;
 
     const session = await prisma.session.findFirst({
-      where: { id: sessionId, student_id: req.user.id, status: 'active' },
+      where: { id: sessionId, student_id: req.user.id },
       include: { quiz: true }
     });
-    if (!session) return res.status(404).json({ error: 'Active session not found' });
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (session.status === 'expired' || session.status === 'submitted') {
+      return res.status(400).json({ error: 'Quiz time has expired', remainingSeconds: 0 });
+    }
+    if (session.status !== 'active') {
+      return res.status(400).json({ error: 'Session is no longer active', remainingSeconds: 0 });
+    }
 
     const elapsedSeconds = Math.floor((Date.now() - session.started_at.getTime()) / 1000);
     let remainingSecs = Math.max(0, session.quiz.duration_seconds - elapsedSeconds);

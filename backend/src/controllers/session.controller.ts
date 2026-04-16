@@ -73,8 +73,12 @@ export const getSessionStatus = async (req: any, res: Response) => {
 
 export const submitSession = async (req: any, res: Response) => {
   try {
-    const session = await prisma.session.findFirst({ where: { id: req.params.id, student_id: req.user.id, status: 'active' } });
-    if (!session) return res.status(404).json({ error: 'Active session not found' });
+    const session = await prisma.session.findFirst({ where: { id: req.params.id, student_id: req.user.id } });
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    if (session.status !== 'active') {
+      return res.json({ message: 'Quiz already submitted', score: session.score, totalMarks: session.total_marks, session });
+    }
 
     await flushRedisBuffer(session.id);
     const { score, totalMarks } = await computeScore(session.id, session.quiz_id);
