@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 
+const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+
 export default function RegisterPage() {
-  const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -13,7 +14,7 @@ export default function RegisterPage() {
     setError('');
     setLoading(true);
     try {
-      const { data } = await axios.post('http://localhost:4000/api/auth/register', form);
+      const { data } = await axios.post(`${API}/auth/register`, form);
       localStorage.setItem('token', data.token);
       window.location.href = '/';
     } catch (err: any) {
