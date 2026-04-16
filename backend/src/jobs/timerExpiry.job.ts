@@ -13,8 +13,8 @@ export const startTimerExpiryJob = () => {
         if (remaining === null || parseInt(remaining as string) <= 0) {
           console.log(`Auto-submitting expired session: ${session.id}`);
           await flushRedisBuffer(session.id);
-          const { score, totalMarks } = await computeScore(session.id, session.quizId);
-          await prisma.session.update({ where: { id: session.id }, data: { status: 'expired', submittedAt: new Date(), score, totalMarks } });
+          const { score, totalMarks } = await computeScore(session.id, session.quiz_id);
+          await prisma.session.update({ where: { id: session.id }, data: { status: 'expired', submitted_at: new Date(), score, total_marks: totalMarks } });
           await redis.del(`session:${session.id}:buffer`);
         }
       }

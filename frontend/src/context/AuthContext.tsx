@@ -1,9 +1,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 
-const API = 'http://localhost:4000/api';
+const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
-interface User { id: string; name: string; email: string; role: 'student' | 'admin'; }
+interface User { id: string; name: string; email: string; role: 'student' | 'admin'; roll_no?: string; }
 interface AuthCtx { user: User | null; token: string | null; login: (email: string, password: string) => Promise<void>; logout: () => void; loading: boolean; }
 
 const AuthContext = createContext<AuthCtx>({} as AuthCtx);

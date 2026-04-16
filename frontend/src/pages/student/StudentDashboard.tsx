@@ -24,7 +24,7 @@ export default function StudentDashboard() {
     try {
       const api = apiClient(token);
       const { data } = await api.post('/sessions', { quizId });
-      sessionStorage.setItem(`quiz_${data.session.id}`, JSON.stringify({ questions: data.questions, remainingSeconds: data.remainingSeconds }));
+      sessionStorage.setItem(`quiz_${data.session.id}`, JSON.stringify({ questions: data.questions, remaining_seconds: data.remaining_seconds }));
       navigate(`/quiz/${data.session.id}`);
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to start quiz');
@@ -62,7 +62,7 @@ export default function StudentDashboard() {
                     </div>
                     <p>{q.description || 'No description'}</p>
                     <div className="quiz-meta">
-                      <span className="quiz-meta-item">⏱ {formatTime(q.durationSeconds)}</span>
+                      <span className="quiz-meta-item">⏱ {formatTime(q.duration_seconds)}</span>
                       <span className="quiz-meta-item">📝 {q._count?.questions || 0} questions</span>
                     </div>
                     <button
@@ -90,9 +90,9 @@ export default function StudentDashboard() {
                     {sessions.map(s => (
                       <tr key={s.id}>
                         <td>{s.quiz?.title}</td>
-                        <td>{new Date(s.startedAt).toLocaleString()}</td>
+                        <td>{new Date(s.started_at).toLocaleString()}</td>
                         <td><span className={`badge badge-${s.status}`}>{s.status}</span></td>
-                        <td>{s.score !== null ? `${s.score} / ${s.totalMarks}` : '—'}</td>
+                        <td>{s.score !== null ? `${s.score} / ${s.total_marks}` : '—'}</td>
                         <td>{(s.status === 'submitted' || s.status === 'expired') && <button className="btn btn-outline btn-sm" onClick={() => navigate(`/result/${s.id}`)}>View Result</button>}</td>
                       </tr>
                     ))}

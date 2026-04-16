@@ -11,14 +11,15 @@ import { startBufferFlushJob } from './jobs/bufferFlush.job';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
+app.use(cors({ origin: allowedOrigin, credentials: true }));
 app.use(express.json());
+
+app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api', quizRoutes);
 app.use('/api/admin', adminRoutes);
-
-app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 
 const start = async () => {
   await connectRedis();

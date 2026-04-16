@@ -11,7 +11,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [tab, setTab] = useState<'quizzes' | 'students'>('quizzes');
-  const [form, setForm] = useState({ title: '', description: '', durationSeconds: 3600, shuffleQuestions: false });
+  const [form, setForm] = useState({ title: '', description: '', duration_seconds: 3600, shuffle_questions: false });
   const [saving, setSaving] = useState(false);
 
   const api = apiClient(token);
@@ -28,7 +28,7 @@ export default function AdminDashboard() {
     e.preventDefault(); setSaving(true);
     try {
       await api.post('/admin/quizzes', form);
-      setShowModal(false); setForm({ title: '', description: '', durationSeconds: 3600, shuffleQuestions: false });
+      setShowModal(false); setForm({ title: '', description: '', duration_seconds: 3600, shuffle_questions: false });
       load();
     } catch (err: any) { alert(err.response?.data?.error || 'Failed'); }
     finally { setSaving(false); }
@@ -80,7 +80,7 @@ export default function AdminDashboard() {
                   {quizzes.map(q => (
                     <tr key={q.id}>
                       <td style={{ fontWeight: 600 }}>{q.title}</td>
-                      <td>{Math.floor(q.durationSeconds / 60)}m</td>
+                      <td>{Math.floor(q.duration_seconds / 60)}m</td>
                       <td>{q._count?.questions || 0}</td>
                       <td>{q._count?.sessions || 0}</td>
                       <td><span className={`badge badge-${q.status}`}>{q.status}</span></td>
@@ -106,11 +106,11 @@ export default function AdminDashboard() {
                 <tbody>
                   {students.map(s => (
                     <tr key={s.id}>
-                      <td style={{ fontWeight: 600, color: 'var(--primary-light)' }}>{s.rollNo || '—'}</td>
+                      <td style={{ fontWeight: 600, color: 'var(--primary-light)' }}>{s.roll_no || '—'}</td>
                       <td style={{ fontWeight: 600 }}>{s.name}</td>
                       <td style={{ color: 'var(--text-2)' }}>{s.email}</td>
                       <td>{s._count?.sessions || 0}</td>
-                      <td>{new Date(s.createdAt).toLocaleDateString()}</td>
+                      <td>{new Date(s.created_at).toLocaleDateString()}</td>
                       <td><button className="btn btn-outline btn-sm" onClick={() => navigate(`/admin/student/${s.id}`)}>History</button></td>
                     </tr>
                   ))}
@@ -131,9 +131,9 @@ export default function AdminDashboard() {
             <form onSubmit={createQuiz} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="form-group"><label className="label">Title *</label><input className="input" required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Physics Chapter 3" /></div>
               <div className="form-group"><label className="label">Description</label><textarea className="input" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" /></div>
-              <div className="form-group"><label className="label">Duration (minutes)</label><input className="input" type="number" min={1} value={form.durationSeconds / 60} onChange={e => setForm(f => ({ ...f, durationSeconds: parseInt(e.target.value) * 60 }))} /></div>
+              <div className="form-group"><label className="label">Duration (minutes)</label><input className="input" type="number" min={1} value={form.duration_seconds / 60} onChange={e => setForm(f => ({ ...f, duration_seconds: parseInt(e.target.value) * 60 }))} /></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input type="checkbox" id="shuffle" checked={form.shuffleQuestions} onChange={e => setForm(f => ({ ...f, shuffleQuestions: e.target.checked }))} />
+                <input type="checkbox" id="shuffle" checked={form.shuffle_questions} onChange={e => setForm(f => ({ ...f, shuffle_questions: e.target.checked }))} />
                 <label htmlFor="shuffle" style={{ fontSize: 14, cursor: 'pointer', color: 'var(--text-2)' }}>Shuffle questions for each student</label>
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>

@@ -53,5 +53,18 @@ const AppRoutes = () => {
 };
 
 export default function App() {
-  return <AuthProvider><AppRoutes /></AuthProvider>;
+  return (
+    <>
+      <div className="video-background">
+        <iframe
+          src="https://www.youtube.com/embed/mk6lkgBQHeM?autoplay=1&mute=1&loop=1&controls=0&showinfo=0&rel=0&playlist=mk6lkgBQHeM"
+          allow="autoplay; encrypted-media"
+          allowFullScreen
+        ></iframe>
+      </div>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </>
+  );
 }

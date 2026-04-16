@@ -120,12 +120,13 @@ model Concept {
   prerequisites    Concept[]        @relation("ConceptPrerequisites")
   subsequents      Concept[]        @relation("ConceptPrerequisites")
   studentMasteries StudentMastery[]
+  sessionAnswers   SessionAnswer[]
 
   @@map("concepts")
 }
 
 model Question {
-  question_id   String       @id @map("question_id")
+  question_id   String       @id @default(uuid()) @map("question_id")
   quiz_id       String?      @map("quiz_id")
   stem          String       @map("stem")
   question_type String?      @default("mcq") @map("question_type")
@@ -218,6 +219,7 @@ model SessionAnswer {
 
   session  Session  @relation(fields: [session_id], references: [id])
   question Question @relation(fields: [question_id], references: [question_id])
+  concept  Concept? @relation(fields: [concept_id], references: [concept_id])
 
   @@unique([session_id, question_id])
   @@index([session_id])

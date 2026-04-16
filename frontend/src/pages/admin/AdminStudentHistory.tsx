@@ -27,7 +27,7 @@ export default function AdminStudentHistory() {
           <div className="page-header">
             <button style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, marginBottom: 4 }} onClick={() => navigate(-1)}>← Back</button>
             <h1 className="page-title">{student.name}</h1>
-            <p className="page-sub">Roll No: <span style={{ color: 'var(--primary-light)', fontWeight: 600 }}>{student.rollNo}</span> • {student.email}</p>
+            <p className="page-sub">Roll No: <span style={{ color: 'var(--primary-light)', fontWeight: 600 }}>{student.roll_no}</span> • {student.email}</p>
           </div>
 
           <div className="stats-row" style={{ marginBottom: 28 }}>
@@ -83,10 +83,10 @@ export default function AdminStudentHistory() {
                   {student.sessions.map((s: any) => (
                     <tr key={s.id}>
                       <td style={{ fontWeight: 600 }}>{s.quiz?.title}</td>
-                      <td style={{ fontSize: 13 }}>{new Date(s.startedAt).toLocaleString()}</td>
-                      <td style={{ fontSize: 13 }}>{s.submittedAt ? new Date(s.submittedAt).toLocaleString() : '—'}</td>
+                      <td style={{ fontSize: 13 }}>{new Date(s.started_at).toLocaleString()}</td>
+                      <td style={{ fontSize: 13 }}>{s.submitted_at ? new Date(s.submitted_at).toLocaleString() : '—'}</td>
                       <td><span className={`badge badge-${s.status}`}>{s.status}</span></td>
-                      <td>{s.score !== null ? `${s.score}/${s.totalMarks}` : '—'}</td>
+                      <td>{s.score !== null ? `${s.score}/${s.total_marks}` : '—'}</td>
                       <td><button className="btn btn-outline btn-sm" onClick={() => navigate(`/admin/session/${s.id}`)}>View Report</button></td>
                     </tr>
                   ))}

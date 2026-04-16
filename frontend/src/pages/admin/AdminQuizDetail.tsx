@@ -12,9 +12,21 @@ export default function AdminQuizDetail() {
   const [concepts, setConcepts] = useState<any[]>([]);
   const [tab, setTab] = useState<'questions' | 'results'>('questions');
   const [showQModal, setShowQModal] = useState(false);
-  const [editQ, setEditQ] = useState<any>(null);
-  const [qForm, setQForm] = useState({ text: '', options: [{ id: 'A', text: '' }, { id: 'B', text: '' }, { id: 'C', text: '' }, { id: 'D', text: '' }], correctAnswer: 'A', marks: 1, orderIndex: 0, conceptName: '' });
   const [saving, setSaving] = useState(false);
+  const [editQ, setEditQ] = useState<any>(null);
+  const [qForm, setQForm] = useState({
+    text: '',
+    options: [
+      { id: 'A', text: '' },
+      { id: 'B', text: '' },
+      { id: 'C', text: '' },
+      { id: 'D', text: '' }
+    ],
+    correct_option: 'A',
+    marks: 1,
+    order_index: 0,
+    conceptIds: [] as string[]   // ← change
+  });
   const api = apiClient(token);
 
   const load = async () => {
@@ -24,9 +36,19 @@ export default function AdminQuizDetail() {
 
   useEffect(() => { load(); }, []);
 
-  const openAddQ = () => { setEditQ(null); setQForm({ text: '', options: [{ id: 'A', text: '' }, { id: 'B', text: '' }, { id: 'C', text: '' }, { id: 'D', text: '' }], correctAnswer: 'A', marks: 1, orderIndex: quiz?.questions?.length || 0, conceptName: '' }); setShowQModal(true); };
-  const openEditQ = (q: any) => { setEditQ(q); setQForm({ text: q.text, options: q.options, correctAnswer: q.correctAnswer, marks: q.marks, orderIndex: q.orderIndex, conceptName: q.concept?.name || '' }); setShowQModal(true); };
-
+  const openAddQ = () => { setEditQ(null); setQForm({ text: '', options: [{ id: 'A', text: '' }, { id: 'B', text: '' }, { id: 'C', text: '' }, { id: 'D', text: '' }], correct_option: 'A', marks: 1, order_index: quiz?.questions?.length || 0, conceptIds: [] }); setShowQModal(true); };
+  const openEditQ = (q: any) => {
+    setEditQ(q);
+    setQForm({
+      text: q.text,
+      options: q.options,
+      correct_option: q.correct_option,
+      marks: q.marks,
+      order_index: q.order_index,
+      conceptIds: q.concepts?.map((c: any) => c.id) || []   // ← important
+    });
+    setShowQModal(true);
+  };
   const saveQuestion = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true);
     try {
@@ -55,7 +77,7 @@ export default function AdminQuizDetail() {
               <h1 className="page-title">{quiz.title}</h1>
               <div style={{ display: 'flex', gap: 12, marginTop: 6, alignItems: 'center' }}>
                 <span className={`badge badge-${quiz.status}`}>{quiz.status}</span>
-                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>⏱ {Math.floor(quiz.durationSeconds / 60)} min</span>
+                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>⏱ {Math.floor(quiz.duration_seconds / 60)} min</span>
                 <span style={{ fontSize: 13, color: 'var(--text-2)' }}>📝 {quiz.questions?.length} questions</span>
               </div>
             </div>
@@ -78,13 +100,13 @@ export default function AdminQuizDetail() {
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>
                           Q{i + 1} · {q.marks} mark{q.marks > 1 ? 's' : ''}
-                          {q.concept?.name && <span style={{ marginLeft: 8, background: 'var(--primary-light)', color: 'white', padding: '2px 6px', borderRadius: 4, opacity: 0.8 }}>{q.concept.name}</span>}
+                          {q.concepts && q.concepts.length > 0 && <span style={{ marginLeft: 8, display: 'inline-flex', gap: 4 }}>{q.concepts.map((c: any) => <span key={c.id} style={{ background: 'var(--primary-light)', color: 'white', padding: '2px 6px', borderRadius: 4, opacity: 0.8, fontSize: 11 }}>{c.name}</span>)}</span>}
                         </div>
                         <div style={{ fontWeight: 500, marginBottom: 12 }}>{q.text}</div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                           {(q.options as any[]).map((opt: any) => (
-                            <div key={opt.id} style={{ padding: '6px 12px', borderRadius: 6, background: opt.id === q.correctAnswer ? 'rgba(16,185,129,0.1)' : 'var(--bg-surface)', border: `1px solid ${opt.id === q.correctAnswer ? 'var(--success)' : 'var(--border)'}`, fontSize: 13, color: opt.id === q.correctAnswer ? 'var(--success)' : 'var(--text-2)' }}>
-                              <strong>{opt.id}.</strong> {opt.text} {opt.id === q.correctAnswer && '✓'}
+                            <div key={opt.id} style={{ padding: '6px 12px', borderRadius: 6, background: opt.id === q.correct_option ? 'rgba(16,185,129,0.1)' : 'var(--bg-surface)', border: `1px solid ${opt.id === q.correct_option ? 'var(--success)' : 'var(--border)'}`, fontSize: 13, color: opt.id === q.correct_option ? 'var(--success)' : 'var(--text-2)' }}>
+                              <strong>{opt.id}.</strong> {opt.text} {opt.id === q.correct_option && '✓'}
                             </div>
                           ))}
                         </div>
@@ -112,10 +134,10 @@ export default function AdminQuizDetail() {
                       <tr key={s.id}>
                         <td style={{ fontWeight: 600 }}>{s.student?.name}</td>
                         <td style={{ color: 'var(--text-2)' }}>{s.student?.email}</td>
-                        <td style={{ fontSize: 13 }}>{new Date(s.startedAt).toLocaleString()}</td>
-                        <td style={{ fontSize: 13 }}>{s.submittedAt ? new Date(s.submittedAt).toLocaleString() : '—'}</td>
+                        <td style={{ fontSize: 13 }}>{new Date(s.started_at).toLocaleString()}</td>
+                        <td style={{ fontSize: 13 }}>{s.submitted_at ? new Date(s.submitted_at).toLocaleString() : '—'}</td>
                         <td><span className={`badge badge-${s.status}`}>{s.status}</span></td>
-                        <td>{s.score !== null ? `${s.score}/${s.totalMarks}` : '—'}</td>
+                        <td>{s.score !== null ? `${s.score}/${s.total_marks}` : '—'}</td>
                         <td><button className="btn btn-outline btn-sm" onClick={() => navigate(`/admin/session/${s.id}`)}>Report</button></td>
                       </tr>
                     ))}
@@ -144,17 +166,29 @@ export default function AdminQuizDetail() {
               ))}
               <div className="form-group">
                 <label className="label">Correct Answer</label>
-                <select className="input" value={qForm.correctAnswer} onChange={e => setQForm(f => ({ ...f, correctAnswer: e.target.value }))}>
+                <select className="input" value={qForm.correct_option} onChange={e => setQForm(f => ({ ...f, correct_option: e.target.value }))}>
                   {qForm.options.map(o => <option key={o.id} value={o.id}>Option {o.id}</option>)}
                 </select>
               </div>
               <div className="form-group"><label className="label">Marks</label><input className="input" type="number" min={1} value={qForm.marks} onChange={e => setQForm(f => ({ ...f, marks: parseInt(e.target.value) }))} /></div>
               <div className="form-group">
-                <label className="label">Concept (Optional)</label>
-                <input className="input" list="concept-list" value={qForm.conceptName} onChange={e => setQForm(f => ({ ...f, conceptName: e.target.value }))} placeholder="Select or type new concept..." />
-                <datalist id="concept-list">
-                  {concepts.map(c => <option key={c.id} value={c.name} />)}
-                </datalist>
+                <label className="label">Concepts (Multi-select)</label>
+                <select
+                  multiple
+                  className="input"
+                  style={{ height: 100 }}
+                  value={qForm.conceptIds}
+                  onChange={e => {
+                    const values = Array.from(e.target.selectedOptions).map(o => o.value);
+                    setQForm(f => ({ ...f, conceptIds: values }));
+                  }}
+                >
+                  {concepts.map(c => (
+                    <option key={c.concept_id} value={c.concept_id}>
+                      {c.concept_name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button type="button" className="btn btn-outline w-full" onClick={() => setShowQModal(false)}>Cancel</button>

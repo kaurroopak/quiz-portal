@@ -38,7 +38,7 @@ export const getQuiz = async (req: any, res: Response) => {
       include: { questions: { orderBy: { order_index: 'asc' }, include: { concepts: true } } },
     });
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
-    
+
     // Process questions to ensure they have the 'options' array
     const questions = quiz.questions.map(q => {
       let options = q.options;
@@ -50,7 +50,18 @@ export const getQuiz = async (req: any, res: Response) => {
           { id: 'D', text: q.option_d },
         ].filter(o => o.text);
       }
-      return { ...q, options };
+      return {
+        id: q.question_id,
+        text: q.stem,                 // <-- FIX
+        options,
+        correct_option: q.correct_answer, // <-- FIX
+        marks: q.marks,
+        order_index: q.order_index,
+        concepts: q.concepts?.map(c => ({
+          id: c.concept_id,
+          name: c.concept_name
+        })) || []
+      };
     });
 
     res.json({ ...quiz, questions });
@@ -77,67 +88,66 @@ export const deleteQuiz = async (req: any, res: Response) => {
 
 export const addQuestion = async (req: any, res: Response) => {
   try {
-    const { text, options, option_a, option_b, option_c, option_d, correctAnswer, marks, orderIndex, conceptId, conceptName } = req.body;
-    let finalConceptId = conceptId;
-    if (!finalConceptId && conceptName) {
-      const existing = await prisma.concept.findFirst({ where: { concept_name: { equals: conceptName, mode: 'insensitive' } } });
-      if (existing) finalConceptId = existing.concept_id;
-      else {
-        const newConcept = await prisma.concept.create({ data: { concept_name: conceptName } });
-        finalConceptId = newConcept.concept_id;
-      }
-    }
+    const {
+      text,
+      options,
+      correct_option,
+      marks,
+      order_index,
+      conceptIds
+    } = req.body;
+
     const question = await prisma.question.create({
       data: {
         quiz_id: String(req.params.quizId),
         stem: text,
         options,
-        option_a,
-        option_b,
-        option_c,
-        option_d,
-        correct_answer: correctAnswer,
+        correct_answer: correct_option,
         marks: marks || 1,
-        order_index: orderIndex || 0,
+        order_index: order_index || 0,
         question_type: 'mcq',
-        concepts: finalConceptId ? { connect: { concept_id: finalConceptId } } : undefined
+        concepts: conceptIds?.length > 0
+          ? { connect: conceptIds.map((id: string) => ({ concept_id: id })) }
+          : undefined
       },
     });
+
     res.status(201).json(question);
-  } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
 };
 
 export const updateQuestion = async (req: any, res: Response) => {
   try {
-    const { text, options, option_a, option_b, option_c, option_d, correctAnswer, marks, orderIndex, conceptId, conceptName } = req.body;
-    let finalConceptId = conceptId;
-    if (!finalConceptId && conceptName) {
-      const existing = await prisma.concept.findFirst({ where: { concept_name: { equals: conceptName, mode: 'insensitive' } } });
-      if (existing) finalConceptId = existing.concept_id;
-      else {
-        const newConcept = await prisma.concept.create({ data: { concept_name: conceptName } });
-        finalConceptId = newConcept.concept_id;
-      }
-    } else if (conceptId === null) {
-      finalConceptId = null;
-    }
+    const {
+      text,
+      options,
+      correct_option,
+      marks,
+      order_index,
+      conceptIds
+    } = req.body;
+
     const question = await prisma.question.update({
       where: { question_id: String(req.params.id) },
       data: {
         stem: text,
         options,
-        option_a,
-        option_b,
-        option_c,
-        option_d,
-        correct_answer: correctAnswer,
+        correct_answer: correct_option,
         marks,
-        order_index: orderIndex,
-        concepts: finalConceptId ? { set: [{ concept_id: finalConceptId }] } : (conceptId === null ? { set: [] } : undefined)
+        order_index: order_index || 0,
+        concepts: conceptIds
+          ? { set: conceptIds.map((id: string) => ({ concept_id: id })) }
+          : { set: [] }
       },
     });
+
     res.json(question);
-  } catch { res.status(500).json({ error: 'Server error' }); }
+  } catch {
+    res.status(500).json({ error: 'Server error' });
+  }
 };
 
 export const deleteQuestion = async (req: any, res: Response) => {
@@ -170,7 +180,7 @@ export const getSessionReport = async (req: any, res: Response) => {
       },
     });
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    
+
     // Process answer questions to ensure they have the 'options' array
     const processedAnswers = session.answers.map(ans => {
       const q = ans.question;
@@ -211,7 +221,7 @@ export const getStudentHistory = async (req: any, res: Response) => {
       },
       include: { concept: true, question: true }
     });
-    
+
     const conceptStats: Record<string, { conceptName: string, correct: number, total: number, score: number, totalMarks: number }> = {};
     for (const a of answers) {
       if (!a.concept_id || !a.concept) continue;

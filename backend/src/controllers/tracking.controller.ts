@@ -50,6 +50,6 @@ export const batchEvents = async (req: any, res: Response) => {
     const newRemaining = Math.max(0, remainingSecs - 5);
     await redis.setEx(`session:${sessionId}:remaining`, newRemaining + 10, String(newRemaining));
 
-    res.json({ status: 'ok', remainingSeconds: newRemaining });
+    res.json({ status: 'ok', remaining_seconds: newRemaining });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 };

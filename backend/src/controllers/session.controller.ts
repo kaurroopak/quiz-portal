@@ -23,8 +23,8 @@ export const startSession = async (req: any, res: Response) => {
     if (quiz.status !== 'active') return res.status(400).json({ error: 'Quiz is not active' });
 
     const existing = await prisma.session.findFirst({ where: { student_id: req.user.id, quiz_id: quizId, status: 'active' } });
-    
-    // Process questions to ensure they have the 'options' array for the frontend
+
+    // Normalize Prisma question fields into the shape the student client expects.
     const processQuestions = (qs: any[]) => {
       return qs.map(({ correct_answer: _ca, ...q }) => {
         let options = q.options;
@@ -36,21 +36,28 @@ export const startSession = async (req: any, res: Response) => {
             { id: 'D', text: q.option_d },
           ].filter(o => o.text);
         }
-        return { ...q, options };
+
+        return {
+          id: q.question_id,
+          text: q.stem,
+          options,
+          marks: q.marks,
+          orderIndex: q.order_index ?? 0,
+        };
       });
     };
 
     if (existing) {
       const remaining = await redis.get(`session:${existing.id}:remaining`);
       const questions = quiz.shuffle_questions ? shuffle(quiz.questions) : quiz.questions;
-      return res.json({ session: existing, questions: processQuestions(questions), remainingSeconds: remaining ? parseInt(remaining as string) : quiz.duration_seconds });
+      return res.json({ session: existing, questions: processQuestions(questions), remaining_seconds: remaining ? parseInt(remaining as string) : quiz.duration_seconds });
     }
 
     const session = await prisma.session.create({ data: { student_id: req.user.id, quiz_id: quizId, ip_address: req.ip } });
     await redis.setEx(`session:${session.id}:remaining`, quiz.duration_seconds, String(quiz.duration_seconds));
 
     const questions = quiz.shuffle_questions ? shuffle(quiz.questions) : quiz.questions;
-    res.status(201).json({ session, questions: processQuestions(questions), remainingSeconds: quiz.duration_seconds });
+    res.status(201).json({ session, questions: processQuestions(questions), remaining_seconds: quiz.duration_seconds });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 };
 
@@ -59,7 +66,7 @@ export const getSessionStatus = async (req: any, res: Response) => {
     const session = await prisma.session.findFirst({ where: { id: req.params.id, student_id: req.user.id } });
     if (!session) return res.status(404).json({ error: 'Session not found' });
     const remaining = await redis.get(`session:${session.id}:remaining`);
-    res.json({ status: session.status, remainingSeconds: remaining ? parseInt(remaining as string) : 0, submittedAt: session.submitted_at });
+    res.json({ status: session.status, remaining_seconds: remaining ? parseInt(remaining as string) : 0, submitted_at: session.submitted_at });
   } catch { res.status(500).json({ error: 'Server error' }); }
 };
 
@@ -91,7 +98,7 @@ export const submitSession = async (req: any, res: Response) => {
       }
     }
 
-    res.json({ message: 'Quiz submitted', score, totalMarks, session: updated });
+    res.json({ message: 'Quiz submitted', score, totalMarks: totalMarks, session: updated });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 };
 
@@ -124,8 +131,8 @@ export const flushRedisBuffer = async (sessionId: string) => {
     const conceptId = conceptMap.get(questionId) || null;
     await prisma.sessionAnswer.upsert({
       where: { session_id_question_id: { session_id: sessionId, question_id: questionId } },
-      update: { selected_answer: data.answer, change_count: data.changeCount, time_taken_ms: BigInt(data.timeSpentMs), marked_for_review: data.markedForReview, concept_id: conceptId },
-      create: { session_id: sessionId, question_id: questionId, selected_answer: data.answer, change_count: data.changeCount, time_taken_ms: BigInt(data.timeSpentMs), marked_for_review: data.markedForReview, concept_id: conceptId },
+      update: { selected_answer: data.answer, change_count: data.changeCount, time_spent_ms: BigInt(data.timeSpentMs), marked_for_review: data.markedForReview, concept_id: conceptId },
+      create: { session_id: sessionId, question_id: questionId, selected_answer: data.answer, change_count: data.changeCount, time_spent_ms: BigInt(data.timeSpentMs), marked_for_review: data.markedForReview, concept_id: conceptId },
     });
   }
 };
