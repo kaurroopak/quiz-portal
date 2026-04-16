@@ -193,7 +193,16 @@ export const getSessionReport = async (req: any, res: Response) => {
           { id: 'D', text: q.option_d },
         ].filter(o => o.text);
       }
-      return { ...ans, question: { ...q, options } };
+      return { 
+        ...ans, 
+        answer: ans.selected_answer,
+        question: { 
+          ...q, 
+          options,
+          text: q.stem,
+          correct_option: q.correct_answer 
+        } 
+      };
     });
 
     res.json({ ...session, answers: processedAnswers });

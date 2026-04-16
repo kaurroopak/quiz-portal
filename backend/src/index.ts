@@ -1,4 +1,8 @@
 import 'dotenv/config';
+
+(BigInt.prototype as any).toJSON = function () {
+  return Number(this);
+};
 import express from 'express';
 import cors from 'cors';
 import { connectRedis } from './config/redis';
