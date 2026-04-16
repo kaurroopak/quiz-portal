@@ -16,11 +16,13 @@ export const batchEvents = async (req: any, res: Response) => {
 
     const session = await prisma.session.findFirst({
       where: { id: sessionId, student_id: req.user.id, status: 'active' },
+      include: { quiz: true }
     });
     if (!session) return res.status(404).json({ error: 'Active session not found' });
 
-    const remaining = await redis.get(`session:${sessionId}:remaining`);
-    const remainingSecs = remaining ? parseInt(remaining as string) : 0;
+    const elapsedSeconds = Math.floor((Date.now() - session.started_at.getTime()) / 1000);
+    let remainingSecs = Math.max(0, session.quiz.duration_seconds - elapsedSeconds);
+
     if (remainingSecs <= 0) return res.status(400).json({ error: 'Quiz time has expired', remainingSeconds: 0 });
 
     const bufferKey = `session:${sessionId}:buffer`;
@@ -47,9 +49,6 @@ export const batchEvents = async (req: any, res: Response) => {
 
     if (dbEvents.length > 0) await prisma.questionEvent.createMany({ data: dbEvents });
 
-    const newRemaining = Math.max(0, remainingSecs - 5);
-    await redis.setEx(`session:${sessionId}:remaining`, newRemaining + 10, String(newRemaining));
-
-    res.json({ status: 'ok', remaining_seconds: newRemaining });
+    res.json({ status: 'ok', remaining_seconds: remainingSecs });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 };

@@ -48,13 +48,13 @@ export const startSession = async (req: any, res: Response) => {
     };
 
     if (existing) {
-      const remaining = await redis.get(`session:${existing.id}:remaining`);
+      const elapsedSeconds = Math.floor((Date.now() - existing.started_at.getTime()) / 1000);
+      const remainingSecs = Math.max(0, quiz.duration_seconds - elapsedSeconds);
       const questions = quiz.shuffle_questions ? shuffle(quiz.questions) : quiz.questions;
-      return res.json({ session: existing, questions: processQuestions(questions), remaining_seconds: remaining ? parseInt(remaining as string) : quiz.duration_seconds });
+      return res.json({ session: existing, questions: processQuestions(questions), remaining_seconds: remainingSecs });
     }
 
     const session = await prisma.session.create({ data: { student_id: req.user.id, quiz_id: quizId, ip_address: req.ip } });
-    await redis.setEx(`session:${session.id}:remaining`, quiz.duration_seconds, String(quiz.duration_seconds));
 
     const questions = quiz.shuffle_questions ? shuffle(quiz.questions) : quiz.questions;
     res.status(201).json({ session, questions: processQuestions(questions), remaining_seconds: quiz.duration_seconds });
@@ -63,10 +63,11 @@ export const startSession = async (req: any, res: Response) => {
 
 export const getSessionStatus = async (req: any, res: Response) => {
   try {
-    const session = await prisma.session.findFirst({ where: { id: req.params.id, student_id: req.user.id } });
+    const session = await prisma.session.findFirst({ where: { id: req.params.id, student_id: req.user.id }, include: { quiz: true } });
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    const remaining = await redis.get(`session:${session.id}:remaining`);
-    res.json({ status: session.status, remaining_seconds: remaining ? parseInt(remaining as string) : 0, submitted_at: session.submitted_at });
+    const elapsedSeconds = Math.floor((Date.now() - session.started_at.getTime()) / 1000);
+    const remainingSecs = Math.max(0, session.quiz.duration_seconds - elapsedSeconds);
+    res.json({ status: session.status, remaining_seconds: remainingSecs, submitted_at: session.submitted_at });
   } catch { res.status(500).json({ error: 'Server error' }); }
 };
 
@@ -82,7 +83,6 @@ export const submitSession = async (req: any, res: Response) => {
     const firstQ = await prisma.question.findFirst({ where: { quiz_id: session.quiz_id } });
     if (firstQ) await prisma.questionEvent.create({ data: { session_id: session.id, question_id: firstQ.question_id, event_type: 'submitted', payload: { score, totalMarks } } });
 
-    await redis.del(`session:${session.id}:remaining`);
     await redis.del(`session:${session.id}:buffer`);
 
     // --- Update Student Knowledge Graph (BKT) ---
